@@ -4,9 +4,10 @@ variable "instance_type" {
   default     = "t2.micro"
 }
 
-
 variable "app_name" {
-  description = "Nombre de la aplicación para nomenclatura de recursos"
+  description = "Nombre de la aplicacion"
   type        = string
-  default     = "tiendatech"
+  default     = "mi-app"
 }
+
+
