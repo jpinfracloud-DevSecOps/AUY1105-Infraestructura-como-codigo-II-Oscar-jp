@@ -3,7 +3,7 @@ resource "aws_vpc" "AUY1105-tiendatech-vpc" {
   cidr_block           = "10.1.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "AUY1105-tiendatech-vpc" }
+  tags                 = { Name = "AUY1105-tiendatech-vpc" }
 }
 
 # Internet Gateway para salida a internet
@@ -18,7 +18,7 @@ resource "aws_subnet" "AUY1105-tiendatech-subnet-pub-1" {
   cidr_block              = "10.1.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
-  tags = { Name = "AUY1105-tiendatech-subnet-pub-1" }
+  tags                    = { Name = "AUY1105-tiendatech-subnet-pub-1" }
 }
 
 # Subred Privada (Solo estructura por ahora)
@@ -26,7 +26,7 @@ resource "aws_subnet" "AUY1105-tiendatech-subnet-priv-1" {
   vpc_id            = aws_vpc.AUY1105-tiendatech-vpc.id
   cidr_block        = "10.1.2.0/24"
   availability_zone = "us-east-1a"
-  tags = { Name = "AUY1105-tiendatech-subnet-priv-1" }
+  tags              = { Name = "AUY1105-tiendatech-subnet-priv-1" }
 }
 
 # Tabla de ruteo pública
