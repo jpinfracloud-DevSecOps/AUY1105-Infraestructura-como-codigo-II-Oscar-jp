@@ -1,83 +1,84 @@
 name: DevSecOps Pipeline – AUY1105
 
-
 on:
+  push:
+    branches: [ main ]
   pull_request:
-    branches:
-      - main          # Solo se activa en PR hacia main (requerido por rubrica)
-
+    branches: [ main ]
 
 jobs:
-  analisis-estatico:
-    name: '1. Analisis Estatico (TFLint)'
+  analisis:
+    name: 'Seguridad, Estatico y Politicas'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-
-      - name: Instalar Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: '1.7.0'
-
-
+      # 1. Analisis Estatico con TFLint
       - name: Instalar TFLint
         uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.50.3
-
-
-      - name: Inicializar TFLint
-        run: tflint --init
-
-
       - name: Ejecutar TFLint
-        run: tflint --recursive
+        run: |
+          tflint --init
+          tflint --recursive
 
-
-  analisis-seguridad:
-    name: '2. Analisis de Seguridad (Checkov)'
-    runs-on: ubuntu-latest
-    needs: analisis-estatico    # Secuencial: espera al job anterior
-    steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-
-
+      # 2. Analisis de Seguridad con Checkov
       - name: Ejecutar Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: .
           framework: terraform
-          soft_fail: true    # (aqui es false: Falla el pipeline si hay vulnerabilidades criticas) 
-                             # Los 7 fallos restantes no se corrigen porque requieren recursos avanzados
-                             # (como Roles de IAM y Flow Logs) restringidos en los AWS Learner Labs, 
-                             #o funciones como EBS Optimized que son incompatibles con la capa gratuita t2.micro. 
-                             # Intentar aplicarlos bloquearía la creación de tu infraestructura debido a permisos 
-                             # insuficientes o errores de compatibilidad de hardware en el entorno de estudiante.
+          soft_fail: true 
 
+      # 3. Instalacion de OPA
+      - name: Instalar OPA
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
 
+      # 4. Generacion de Plan y Validacion de Politicas (OPA)
+      - name: Terraform Plan & OPA Check
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: 'us-east-1'
+        run: |
+          terraform init
+          # Generamos el plan y lo convertimos a JSON para OPA
+          terraform plan -out=tfplan
+          terraform show -json tfplan > tfplan.json
+          
+          echo "Ejecutando politicas OPA..."
+          # Evaluamos ambas politicas. Si hay una 'violation', el comando fallará.
+          opa exec --decision terraform/ec2/violation --bundle policy/ tfplan.json
+          opa exec --decision terraform/ssh/violation --bundle policy/ tfplan.json
 
-
-  validacion-terraform:
-    name: '3. Validacion Terraform'
+  deploy:
+    name: 'Terraform Deploy'
     runs-on: ubuntu-latest
-    needs: analisis-seguridad   # Secuencial: espera al job anterior
+    needs: analisis
+    # Solo despliega si es un push a la rama main (no en PR)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: 'us-east-1'
     steps:
-      - name: Checkout del repositorio
+      - name: Checkout
         uses: actions/checkout@v4
-
 
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: '1.7.0'
 
-
       - name: Terraform Init
-        run: terraform init -backend=false
+        run: terraform init
 
-
-      - name: Terraform Validate
-        run: terraform validate
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
