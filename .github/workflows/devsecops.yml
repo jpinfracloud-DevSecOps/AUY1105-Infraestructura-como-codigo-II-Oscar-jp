@@ -14,6 +14,11 @@ jobs:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.0'
+
       # 1. Analisis Estatico con TFLint
       - name: Instalar TFLint
         uses: terraform-linters/setup-tflint@v4
